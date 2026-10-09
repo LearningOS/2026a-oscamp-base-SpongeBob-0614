@@ -1,0 +1,132 @@
+{
+  "name": "2026a-oscamp-base",
+  "title": "基础阶段 — Rust 进阶 & OS 入门",
+  "courseId": 2074,
+  "totalScore": 100,
+  "secret": "OSCAMP_2026A_BASE_TOKEN",
+  "source": "LearningOS/2026s-oscamp-base-2026s-oscamp-base-exercise-oscamp-base-experiment",
+  "tests": [
+    {
+      "name": "thread_spawn",
+      "score": 3,
+      "target": "native"
+    },
+    {
+      "name": "mutex_counter",
+      "score": 4,
+      "target": "native"
+    },
+    {
+      "name": "channel",
+      "score": 4,
+      "target": "native"
+    },
+    {
+      "name": "process_pipe",
+      "score": 4,
+      "target": "native"
+    },
+    {
+      "name": "mem_primitives",
+      "score": 4,
+      "target": "native"
+    },
+    {
+      "name": "bump_allocator",
+      "score": 5,
+      "target": "native"
+    },
+    {
+      "name": "free_list_allocator",
+      "score": 5,
+      "target": "native"
+    },
+    {
+      "name": "syscall_wrapper",
+      "score": 5,
+      "target": "native"
+    },
+    {
+      "name": "fd_table",
+      "score": 5,
+      "target": "native"
+    },
+    {
+      "name": "atomic_counter",
+      "score": 4,
+      "target": "native"
+    },
+    {
+      "name": "atomic_ordering",
+      "score": 4,
+      "target": "native"
+    },
+    {
+      "name": "spinlock",
+      "score": 4,
+      "target": "native"
+    },
+    {
+      "name": "spinlock_guard",
+      "score": 4,
+      "target": "native"
+    },
+    {
+      "name": "rwlock",
+      "score": 5,
+      "target": "native"
+    },
+    {
+      "name": "stack_coroutine",
+      "score": 6,
+      "target": "riscv64"
+    },
+    {
+      "name": "green_threads",
+      "score": 6,
+      "target": "riscv64"
+    },
+    {
+      "name": "basic_future",
+      "score": 4,
+      "target": "native"
+    },
+    {
+      "name": "tokio_tasks",
+      "score": 3,
+      "target": "native"
+    },
+    {
+      "name": "async_channel_ex",
+      "score": 3,
+      "target": "native"
+    },
+    {
+      "name": "select_timeout",
+      "score": 4,
+      "target": "native"
+    },
+    {
+      "name": "pte_flags",
+      "score": 3,
+      "target": "native"
+    },
+    {
+      "name": "page_table_walk",
+      "score": 4,
+      "target": "native"
+    },
+    {
+      "name": "multi_level_pt",
+      "score": 4,
+      "target": "native"
+    },
+    {
+      "name": "tlb_sim",
+      "score": 3,
+      "target": "native"
+    }
+  ],
+  "sourceCommit": "1196ac363c2cba1dcd7f33cf584b5d746f396ffd",
+  "organization": "LearningOS"
+}

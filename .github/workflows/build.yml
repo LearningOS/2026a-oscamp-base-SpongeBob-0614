@@ -1,0 +1,112 @@
+name: 2026a-oscamp-base grading
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: never
+  TZ: Asia/Shanghai
+  OSCAMP_COURSE_ID: '2074'
+
+jobs:
+  grade:
+    name: Test exercises and calculate score
+    if: >-
+      !startsWith(github.event.repository.name, 'preparing-') &&
+      (github.repository == 'LearningOS/2026a-oscamp-base' || vars.STUDENT_GITHUB != '')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    concurrency:
+      group: course-grading-${{ github.repository }}
+      cancel-in-progress: true
+    outputs:
+      artifact_id: ${{ steps.evidence.outputs.artifact-id }}
+      ready: ${{ steps.grade.outputs.ready }}
+      score: ${{ steps.grade.outputs.score }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Keep temporary files inside the repository
+        run: |
+          mkdir -p tmp/grade
+          echo "TMPDIR=$GITHUB_WORKSPACE/tmp" >> "$GITHUB_ENV"
+      - name: Install Linux and RISC-V tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-riscv64-linux-gnu qemu-user
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: 1.98.1
+          targets: riscv64gc-unknown-linux-gnu
+      - name: Show grading toolchain
+        run: |
+          rustc --version
+          cargo --version
+          qemu-riscv64 --version
+      - name: Run the course checker
+        id: grade
+        run: python3 .github/scripts/grade.py
+      - name: Preserve measured results and raw logs
+        id: evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: course-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tmp/grade/*.json
+            tmp/grade/*.log
+            Cargo.lock
+          retention-days: 30
+      - name: Mark unfinished exercises
+        if: steps.grade.outputs.ready == 'true' && steps.grade.outputs.passed != 'true'
+        run: |
+          echo 'Some exercises have not passed. The measured partial score is available in the summary and artifact.'
+          exit 1
+
+  report:
+    name: Save measured score and upload to OpenCamp
+    needs: grade
+    if: >-
+      !startsWith(github.event.repository.name, 'preparing-') &&
+      always() && !cancelled() && needs.grade.outputs.ready == 'true' &&
+      needs.grade.outputs.artifact_id != '' &&
+      github.repository_owner == 'LearningOS' &&
+      github.repository != 'LearningOS/2026a-oscamp-base' &&
+      vars.STUDENT_GITHUB != '' && github.actor == vars.STUDENT_GITHUB
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    concurrency:
+      group: course-score-upload
+      queue: max
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ needs.grade.outputs.artifact_id }}
+          path: tmp/download
+          merge-multiple: true
+      - name: Locate the measured result
+        run: |
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          import shutil
+          files = list(Path('tmp/download').rglob('result.json'))
+          if len(files) != 1:
+              raise SystemExit('Expected exactly one measured result artifact.')
+          Path('tmp/grade').mkdir(parents=True, exist_ok=True)
+          shutil.copyfile(files[0], 'tmp/grade/result.json')
+          PYTHON
+      - name: Upload the assigned student's measured score
+        env:
+          STUDENT_GITHUB: ${{ vars.STUDENT_GITHUB }}
+          COURSE_TOKEN: ${{ secrets.OSCAMP_2026A_BASE_TOKEN }}
+        run: python3 .github/scripts/publish.py

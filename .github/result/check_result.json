@@ -1,0 +1,35 @@
+{
+  "exercises": [
+    {"name": "thread_spawn", "result": false},
+    {"name": "mutex_counter", "result": false},
+    {"name": "channel", "result": false},
+    {"name": "process_pipe", "result": false},
+    {"name": "mem_primitives", "result": false},
+    {"name": "bump_allocator", "result": false},
+    {"name": "free_list_allocator", "result": false},
+    {"name": "syscall_wrapper", "result": false},
+    {"name": "fd_table", "result": false},
+    {"name": "atomic_counter", "result": false},
+    {"name": "atomic_ordering", "result": false},
+    {"name": "spinlock", "result": false},
+    {"name": "spinlock_guard", "result": false},
+    {"name": "rwlock", "result": false},
+    {"name": "stack_coroutine", "result": false},
+    {"name": "green_threads", "result": false},
+    {"name": "basic_future", "result": false},
+    {"name": "tokio_tasks", "result": false},
+    {"name": "async_channel_ex", "result": false},
+    {"name": "select_timeout", "result": false},
+    {"name": "pte_flags", "result": false},
+    {"name": "page_table_walk", "result": false},
+    {"name": "multi_level_pt", "result": false},
+    {"name": "tlb_sim", "result": false}
+  ],
+  "statistics": {
+    "total_exercations": 24,
+    "total_succeeds": 0,
+    "total_failures": 24,
+    "total_score": 0,
+    "total_possible": 100
+  }
+}

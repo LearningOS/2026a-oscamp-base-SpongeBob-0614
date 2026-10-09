@@ -1,0 +1,591 @@
+## OS Camp Exercise Configuration
+## Each [[exercise]] defines one exercise
+
+# ============================================================
+#  Module 1: Concurrency (Synchronous)
+# ============================================================
+
+[[exercise]]
+name = "Thread Creation"
+package = "thread_spawn"
+path = "exercises/01_concurrency_sync/01_thread_spawn/src/lib.rs"
+module = "Concurrency (Synchronous)"
+description = "Learn thread::spawn to create threads, move closures to pass data, join to wait for completion"
+hint = """
+Function double_in_thread:
+  let handle = thread::spawn(move || {
+      numbers.into_iter().map(|n| n * 2).collect()
+  });
+  handle.join().unwrap()
+
+Function parallel_sum:
+  Spawn two threads separately, each using iter().sum::<i32>() to sum
+  Then join both threads and extract return values to form tuple"""
+
+[[exercise]]
+name = "Mutex Shared State"
+package = "mutex_counter"
+path = "exercises/01_concurrency_sync/02_mutex_counter/src/lib.rs"
+module = "Concurrency (Synchronous)"
+description = "Use Arc<Mutex<T>> to safely share and modify data between multiple threads"
+hint = """
+concurrent_counter:
+  let counter = Arc::new(Mutex::new(0usize));
+  for _ in 0..n_threads {
+      let c = Arc::clone(&counter);
+      // spawn thread, inside loop count_per_thread times
+      // each time: let mut num = c.lock().unwrap(); *num += 1;
+  }
+  // after joining all threads: *counter.lock().unwrap()
+
+concurrent_collect:
+  Similar approach, use Arc<Mutex<Vec<usize>>>, each thread pushes its own id"""
+
+[[exercise]]
+name = "Channel Communication"
+package = "channel"
+path = "exercises/01_concurrency_sync/03_channel/src/lib.rs"
+module = "Concurrency (Synchronous)"
+description = "Use mpsc::channel to pass messages between threads, multiple producer pattern"
+hint = """
+simple_send_recv:
+  let (tx, rx) = mpsc::channel();
+  thread::spawn(move || {
+      for item in items { tx.send(item).unwrap(); }
+  });
+  rx.iter().collect()   // automatically ends when all tx are dropped
+
+multi_producer:
+  After creating channel, clone tx for each producer:
+  for id in 0..n_producers {
+      let tx = tx.clone();
+      spawn(move || tx.send(format!("msg from {id}")).unwrap());
+  }
+  drop(tx);  // Must drop original tx! Otherwise rx.iter() never ends
+  rx.iter().sorted()"""
+
+[[exercise]]
+name = "Process Pipes"
+package = "process_pipe"
+path = "exercises/01_concurrency_sync/04_process_pipe/src/lib.rs"
+module = "Concurrency (Synchronous)"
+description = "Use Command to create child processes, communicate via Stdio::piped() pipes"
+hint = """
+run_command:
+  let output = Command::new(program)
+      .args(args)
+      .stdout(Stdio::piped())
+      .output().unwrap();
+  String::from_utf8(output.stdout).unwrap()
+
+pipe_through_cat:
+  let mut child = Command::new("cat")
+      .stdin(Stdio::piped())
+      .stdout(Stdio::piped())
+      .spawn().unwrap();
+  child.stdin.take().unwrap().write_all(input.as_bytes()).unwrap();
+  // stdin is dropped here (pipe closed), cat will output and exit
+  let output = child.wait_with_output().unwrap();
+
+get_exit_code:
+  Command::new("sh").args(["-c", command]).status().unwrap().code().unwrap()"""
+
+
+# ============================================================
+#  Module 2: no_std Development
+# ============================================================
+
+[[exercise]]
+name = "Memory Primitives (no_std)"
+package = "mem_primitives"
+path = "exercises/02_no_std_dev/01_mem_primitives/src/lib.rs"
+module = "no_std Development"
+description = "Implement memcpy/memset/memmove/strlen/strcmp memory primitives in a #![no_std] environment"
+hint = """
+General approach:
+  - All functions operate via unsafe pointer arithmetic using ptr.add(i)
+  - Note the return value requirements (memcpy/memset/memmove must return the dst pointer)
+
+my_memmove vs my_memcpy:
+  - memcpy can simply copy bytes forward one by one
+  - memmove must handle overlapping src and dst regions
+  - Think: what happens when dst is after src with overlap and you copy forward?
+
+my_strcmp:
+  - C strcmp semantics: return 0 if equal, otherwise the difference of the first differing byte
+  - Don't forget to handle the case where both strings reach '\\0'"""
+
+[[exercise]]
+name = "Bump Allocator (no_std core)"
+package = "bump_allocator"
+path = "exercises/02_no_std_dev/02_bump_allocator/src/lib.rs"
+module = "no_std Development"
+description = "Implement a Bump Allocator with core::alloc::GlobalAlloc, using CAS atomics for thread safety"
+hint = """
+Core steps for alloc:
+  1. Load the current allocation position (next)
+  2. Align up according to layout.align() (think about the bit trick for rounding up)
+  3. Check that the aligned address + layout.size() does not exceed the heap boundary
+  4. Atomically update next with CAS (compare_exchange); retry on failure
+
+Think about:
+  - Why can't you use a simple store instead of CAS? (what happens under concurrency?)
+  - The align-up formula: (addr + align - 1) & !(align - 1) — why does it work?
+  - Why is dealloc typically a no-op in a bump allocator?"""
+
+[[exercise]]
+name = "Free-List Allocator"
+package = "free_list_allocator"
+path = "exercises/02_no_std_dev/03_free_list_allocator/src/lib.rs"
+module = "no_std Development"
+description = "Build a Free-List Allocator on top of a Bump Allocator with an intrusive linked list for deallocation"
+hint = """
+alloc strategy (two-level):
+  1. Walk the free list looking for a reusable block (first-fit: size sufficient and alignment met)
+  2. If found, unlink the node from the list and return it; otherwise fall back to bump allocation
+  - Unlinking requires the "previous pointer" technique to update the predecessor's next
+
+dealloc strategy:
+  - Insert the freed block as a FreeBlock node at the head of the list (head insertion)
+  - FreeBlock is intrusive: it reuses the first bytes of the freed memory for size and next
+
+Think about:
+  - Why can free list nodes live inside the freed memory? What's the minimum block size?
+  - What are the trade-offs between first-fit and best-fit?"""
+
+[[exercise]]
+name = "Syscall Wrapper"
+package = "syscall_wrapper"
+path = "exercises/02_no_std_dev/04_syscall_wrapper/src/lib.rs"
+module = "no_std Development"
+description = "Describe the Linux syscall ABI (instruction, registers, syscall numbers) for x86_64/aarch64/riscv64 and implement real syscalls on the current platform"
+hint = """
+ABI knowledge:
+  - Look up the syscall calling convention docs for each architecture
+  - x86_64: see Linux kernel arch/x86/entry/syscalls/ or man syscall(2)
+  - aarch64/riscv64: they share the asm-generic syscall number table, different from x86_64
+  - Think: which architectures' syscall instructions clobber extra registers? Why?
+
+syscall3 inline assembly:
+  - Check the Rust core::arch::asm! docs for inlateout / in / out usage
+  - x86_64's syscall instruction implicitly clobbers two registers — declare them with out
+  - aarch64's return register is also the first argument register — use inlateout
+
+sys_write and other wrappers:
+  - Use the NATIVE_SYS_* constants (already defined per platform), not hardcoded numbers
+  - buf.as_ptr() as usize converts a slice pointer to the address value syscall expects"""
+
+[[exercise]]
+name = "File Descriptor Table"
+package = "fd_table"
+path = "exercises/02_no_std_dev/05_fd_table/src/lib.rs"
+module = "no_std Development"
+description = "Implement a process fd table: Vec<Option<Arc<dyn File>>> with alloc/get/close and lowest-fd reuse"
+hint = """
+Core data structure:
+  - Use Vec<Option<...>> to represent the fd table; the index IS the fd number
+  - None means the fd is unused, Some(...) means allocated
+
+alloc — lowest fd allocation:
+  - POSIX requires open() to return the lowest available fd
+  - First scan existing slots for the first None; if not found, push a new entry
+
+get / close:
+  - Don't forget bounds checking: fd may exceed the Vec length
+  - close sets the slot to None rather than removing from the Vec (why?)
+
+Think about:
+  - Why Arc<dyn File> instead of Box<dyn File>? (multiple fds can point to the same file)
+  - How would you implement dup2 on top of this table?"""
+
+# ============================================================
+#  Module 3: OS Concurrency Advanced
+# ============================================================
+
+[[exercise]]
+name = "Atomic Counter"
+package = "atomic_counter"
+path = "exercises/03_os_concurrency/01_atomic_counter/src/lib.rs"
+module = "OS Concurrency Advanced"
+description = "Use AtomicU64 to implement lock-free counter, learn CAS operations"
+hint = """
+increment: self.value.fetch_add(1, Ordering::Relaxed)
+decrement: self.value.fetch_sub(1, Ordering::Relaxed)
+get:       self.value.load(Ordering::Relaxed)
+
+compare_and_swap:
+  self.value.compare_exchange(expected, new_val,
+      Ordering::AcqRel, Ordering::Acquire)
+
+fetch_multiply (CAS loop):
+  loop {
+      let current = self.get();
+      match self.compare_and_swap(current, current * multiplier) {
+          Ok(v) => return v,
+          Err(_) => continue,  // modified by other thread, retry
+      }
+  }"""
+
+[[exercise]]
+name = "Memory Ordering"
+package = "atomic_ordering"
+path = "exercises/03_os_concurrency/02_atomic_ordering/src/lib.rs"
+module = "OS Concurrency Advanced"
+description = "Use correct memory ordering to ensure data visibility between threads"
+hint = """
+FlagChannel::produce:
+  self.data.store(value, Ordering::Relaxed);   // write data first
+  self.ready.store(true, Ordering::Release);   // Release ensures data write is visible to other threads
+
+FlagChannel::consume:
+  while !self.ready.load(Ordering::Acquire) {  // Acquire pairs with Release
+      std::hint::spin_loop();
+  }
+  self.data.load(Ordering::Relaxed)  // Acquire guarantees seeing produce's data write
+
+OnceCell::init:
+  match self.initialized.compare_exchange(false, true, SeqCst, SeqCst) {
+      Ok(_) => { self.value.store(val, SeqCst); true }
+      Err(_) => false
+  }"""
+
+[[exercise]]
+name = "Spinlock"
+package = "spinlock"
+path = "exercises/03_os_concurrency/03_spinlock/src/lib.rs"
+module = "OS Concurrency Advanced"
+description = "Implement basic spinlock, understand compare_exchange and busy waiting"
+hint = """
+lock:
+  loop {
+      match self.locked.compare_exchange(
+          false, true, Ordering::Acquire, Ordering::Relaxed
+      ) {
+          Ok(_) => return unsafe { &mut *self.data.get() },
+          Err(_) => core::hint::spin_loop(),
+      }
+  }
+
+unlock:
+  self.locked.store(false, Ordering::Release);
+
+try_lock:
+  Similar to lock, but try compare_exchange only once
+  Success returns Some(...), failure returns None"""
+
+[[exercise]]
+name = "RAII Spinlock Guard"
+package = "spinlock_guard"
+path = "exercises/03_os_concurrency/04_spinlock_guard/src/lib.rs"
+module = "OS Concurrency Advanced"
+description = "Use Deref/DerefMut/Drop to implement RAII guard, automatically release lock when leaving scope"
+hint = """
+SpinLock::lock:
+  Spin to acquire lock (same as previous exercise), then:
+  SpinGuard { lock: self }
+
+Deref for SpinGuard:
+  unsafe { &*self.lock.data.get() }
+
+DerefMut for SpinGuard:
+  unsafe { &mut *self.lock.data.get() }
+
+Drop for SpinGuard:
+  self.lock.locked.store(false, Ordering::Release);
+
+RAII benefit: even panic automatically releases lock (Drop called during unwind)"""
+
+[[exercise]]
+name = "Read-Write Lock (Writer-Priority)"
+package = "rwlock"
+path = "exercises/03_os_concurrency/05_rwlock/src/lib.rs"
+module = "OS Concurrency Advanced"
+description = "Implement writer-priority RwLock from scratch using atomics; no std::sync::RwLock"
+hint = """
+Rust provides std::sync::RwLock; this exercise implements a minimal writer-priority version for learning.
+
+State in one AtomicU32: reader_count (low bits), WRITER_HOLDING, WRITER_WAITING. Writer-priority: set WRITER_WAITING before waiting so new readers block.
+
+read: spin until !WRITER_HOLDING && !WRITER_WAITING, then CAS increment reader count. Release: fetch_sub(1).
+write: fetch_or(WRITER_WAITING); spin until no readers and no holder; CAS(WRITER_WAITING, WRITER_HOLDING). Release: fetch_and(!(WRITER_HOLDING|WRITER_WAITING)).
+Guards: Deref/DerefMut and Drop to release."""
+
+# ============================================================
+#  Module 4: Context Switching
+# ============================================================
+
+[[exercise]]
+name = "Stackful Coroutine"
+package = "stack_coroutine"
+path = "exercises/04_context_switch/01_stack_coroutine/src/lib.rs"
+module = "Context Switching"
+description = "Use inline assembly to implement context save/restore, understand callee-saved registers"
+hint = """
+TaskContext::init:
+  unsafe {
+      let stack_ptr = stack_top as *mut usize;
+      *stack_ptr.sub(1) = entry;  // place entry address at stack top (simulate return address)
+  }
+  self.rsp = (stack_top - 8) as u64;  // rsp points to return address
+
+switch_context:
+  asm!(
+      "mov [rdi+0x00], rsp",  "mov [rdi+0x08], rbx",  // ... save to old
+      "mov rsp, [rsi+0x00]",  "mov rbx, [rsi+0x08]",  // ... restore from new
+      "ret",                  // pop stack top address and jump
+      in("rdi") old as *mut _ as u64,
+      in("rsi") new as *const _ as u64,
+      clobber_abi("C"),
+  );
+
+alloc_stack:
+  let buf = vec![0u8; STACK_SIZE];
+  let top = buf.as_ptr() as usize + STACK_SIZE;
+  (buf, top)"""
+
+[[exercise]]
+name = "Green Threads"
+package = "green_threads"
+path = "exercises/04_context_switch/02_green_threads/src/lib.rs"
+module = "Context Switching"
+description = "Implement cooperative green thread scheduler based on context switching"
+hint = """
+spawn: allocate stack, place two addresses at stack top:
+  *(top-8)  = thread_finished as usize  // guard function (called after entry returns)
+  *(top-16) = entry as usize            // entry address
+  ctx.rsp = top - 16
+
+schedule_next: poll for next Ready thread
+  for i in 1..=self.threads.len() {
+      let next = (self.current + i) % self.threads.len();
+      if self.threads[next].state == Ready { ... switch ... }
+  }
+
+run:
+  unsafe { SCHEDULER = self as *mut _; }
+  loop {
+      let alive = self.threads.iter().skip(1)
+          .any(|t| t.state != Finished);
+      if !alive { break; }
+      self.schedule_next();
+  }"""
+
+# ============================================================
+#  Module 5: Async Programming
+# ============================================================
+
+[[exercise]]
+name = "Manual Future Implementation"
+package = "basic_future"
+path = "exercises/05_async_programming/01_basic_future/src/lib.rs"
+module = "Async Programming"
+description = "Manually implement Future trait for custom types, understand Poll/Waker mechanism"
+hint = """
+CountDown:
+  fn poll(self: Pin<&mut Self>, cx: ...) -> Poll<...> {
+      let this = self.get_mut();
+      if this.count == 0 {
+          Poll::Ready("liftoff!")
+      } else {
+          this.count -= 1;
+          cx.waker().wake_by_ref();  // ensure will be polled again
+          Poll::Pending
+      }
+  }
+
+YieldOnce:
+  Similar logic, check self.yielded flag
+  first poll: yielded = true, wake, Pending
+  second poll: Ready(())"""
+
+[[exercise]]
+name = "Tokio Async Tasks"
+package = "tokio_tasks"
+path = "exercises/05_async_programming/02_tokio_tasks/src/lib.rs"
+module = "Async Programming"
+description = "Use tokio::spawn to create concurrent async tasks, JoinHandle to collect results"
+hint = """
+concurrent_squares:
+  let mut handles = Vec::new();
+  for i in 0..n {
+      handles.push(tokio::spawn(async move { i * i }));
+  }
+  let mut results = Vec::new();
+  for h in handles {
+      results.push(h.await.unwrap());
+  }
+
+parallel_sleep_tasks:
+  Similar, but add sleep(Duration::from_millis(duration_ms)).await in each task
+  Finally sort results"""
+
+[[exercise]]
+name = "Async Channel"
+package = "async_channel_ex"
+path = "exercises/05_async_programming/03_async_channel/src/lib.rs"
+module = "Async Programming"
+description = "Use tokio::sync::mpsc async channel to implement producer-consumer pattern"
+hint = """
+producer_consumer:
+  let (tx, mut rx) = mpsc::channel(items.len().max(1));
+  tokio::spawn(async move {
+      for item in items { tx.send(item).await.unwrap(); }
+  });
+  let mut result = Vec::new();
+  while let Some(item) = rx.recv().await {
+      result.push(item);
+  }
+
+fan_in:
+  Clone tx for each producer, remember to drop original tx"""
+
+[[exercise]]
+name = "Select and Timeout"
+package = "select_timeout"
+path = "exercises/05_async_programming/04_select_timeout/src/lib.rs"
+module = "Async Programming"
+description = "Use tokio::select! to implement race execution and timeout control"
+hint = """
+with_timeout:
+  tokio::select! {
+      val = future => Some(val),
+      _ = sleep(Duration::from_millis(timeout_ms)) => None,
+  }
+  Note: future needs to be pinned: tokio::pin!(future);
+
+race:
+  tokio::select! {
+      val = f1 => val,
+      val = f2 => val,
+  }
+  Similarly needs pin: tokio::pin!(f1); tokio::pin!(f2);"""
+
+# ============================================================
+#  Module 6: Page Tables
+# ============================================================
+
+[[exercise]]
+name = "Page Table Entry Flags"
+package = "pte_flags"
+path = "exercises/06_page_table/01_pte_flags/src/lib.rs"
+module = "Page Tables"
+description = "Learn RISC-V SV39 page table entry bit layout, use bit operations to construct and parse PTE"
+hint = """
+make_pte:
+  (ppn << 10) | flags
+
+extract_ppn:
+  (pte >> 10) & ((1u64 << 44) - 1)
+
+extract_flags:
+  pte & 0xFF
+
+is_valid:
+  pte & PTE_V != 0
+
+is_leaf:
+  pte & (PTE_R | PTE_W | PTE_X) != 0
+
+check_permission:
+  First check is_valid(pte)
+  if read  && pte & PTE_R == 0 { return false; }
+  if write && pte & PTE_W == 0 { return false; }
+  if execute && pte & PTE_X == 0 { return false; }
+  true"""
+
+[[exercise]]
+name = "Single-Level Page Table"
+package = "page_table_walk"
+path = "exercises/06_page_table/02_page_table_walk/src/lib.rs"
+module = "Page Tables"
+description = "Implement single-level page table mapping, unmapping, and virtual address translation"
+hint = """
+va_to_vpn:   (va >> 12) as usize
+va_to_offset: va & 0xFFF
+make_pa:     ppn * 4096 + offset
+
+map:  self.entries[vpn] = Some(PageTableEntry { ppn, flags });
+unmap: self.entries[vpn] = None;
+lookup: self.entries[vpn].as_ref()
+
+translate:
+  let vpn = (va >> 12) as usize;
+  let offset = va & 0xFFF;
+  match self.lookup(vpn) {
+      None => PageFault,
+      Some(pte) => {
+          if pte.flags & PTE_VALID == 0 { return PageFault; }
+          if is_write && pte.flags & PTE_WRITE == 0 { return PermissionDenied; }
+          Ok(pte.ppn * PAGE_SIZE as u32 + offset)
+      }
+  }"""
+
+[[exercise]]
+name = "SV39 Three-Level Page Table"
+package = "multi_level_pt"
+path = "exercises/06_page_table/03_multi_level_pt/src/lib.rs"
+module = "Page Tables"
+description = "Implement SV39 three-level page table construction, mapping, and page table walk (including huge pages)"
+hint = """
+extract_vpn:
+  ((va >> (12 + level * 9)) & 0x1FF) as usize
+
+map_page:
+  let mut ppn = self.root_ppn;
+  for level in [2, 1]:
+      let idx = extract_vpn(va, level);
+      let pte = nodes[ppn].entries[idx];
+      if pte & PTE_V == 0:
+          let new = alloc_node();
+          nodes[ppn].entries[idx] = (new << 10) | PTE_V;
+      ppn = nodes[ppn].entries[idx] >> 10;
+  // level 0:
+  let idx = extract_vpn(va, 0);
+  nodes[ppn].entries[idx] = ((pa >> 12) << 10) | flags;
+
+translate:
+  let offset = va & 0xFFF;
+  ppn = root_ppn;
+  for level in [2, 1, 0]:
+      let pte = nodes[ppn].entries[extract_vpn(va, level)];
+      if pte & PTE_V == 0: PageFault
+      if pte & (R|W|X) != 0:  // leaf entry
+          if level == 1: offset = va & 0x1FFFFF  // 2MB huge page
+          return Ok((pte >> 10) * 4096 + offset)
+      ppn = pte >> 10;
+
+map_superpage: similar to map_page, but write leaf PTE only up to level 1"""
+
+[[exercise]]
+name = "TLB Simulation"
+package = "tlb_sim"
+path = "exercises/06_page_table/04_tlb_sim/src/lib.rs"
+module = "Page Tables"
+description = "Simulate TLB lookup/insert/FIFO replacement/flush (all/by page/by ASID)"
+hint = """
+lookup:
+  for entry in &self.entries:
+      if entry.valid && entry.vpn == vpn && entry.asid == asid:
+          self.stats.hits += 1; return Some(entry.ppn)
+  self.stats.misses += 1; None
+
+insert:
+  First check if (vpn, asid) entry already exists, update if present
+  Otherwise: self.entries[self.fifo_ptr] = TlbEntry { valid: true, ... };
+        self.fifo_ptr = (self.fifo_ptr + 1) % self.capacity;
+
+flush_all:   all entry.valid = false
+flush_by_vpn:  matching vpn entry.valid = false
+flush_by_asid: matching asid entry.valid = false
+
+valid_count: self.entries.iter().filter(|e| e.valid).count()
+
+Mmu::translate:
+  if let Some(ppn) = self.tlb.lookup(vpn, self.current_asid):
+      return Some(ppn)
+  // TLB miss: check page table
+  for (asid, mapping) in &self.page_table:
+      if *asid == self.current_asid && mapping.vpn == vpn:
+          self.tlb.insert(vpn, mapping.ppn, self.current_asid, mapping.flags);
+          return Some(mapping.ppn)
+  None"""

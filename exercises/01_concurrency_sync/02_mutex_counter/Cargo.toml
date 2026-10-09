@@ -1,0 +1,4 @@
+[package]
+name = "mutex_counter"
+version = "0.1.0"
+edition = "2021"
