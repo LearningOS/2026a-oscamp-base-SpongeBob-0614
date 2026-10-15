@@ -21,6 +21,12 @@ Thumbs.db
 *.dSYM/
 *.pdb
 
+# Crash dumps
+core
+core.[0-9]*
+*.core
+*.dmp
+
 # Course automation outputs and local student roster
 /tmp/
 /rank/
