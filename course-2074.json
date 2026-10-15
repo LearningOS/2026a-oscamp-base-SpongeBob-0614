@@ -1,0 +1,184 @@
+{
+  "schema": 1,
+  "courseId": 2074,
+  "repository": "LearningOS/2026a-oscamp-base-SpongeBob-0614",
+  "commit": "f520ee98b930b89c081668360f855cfff014c848",
+  "score": 0,
+  "totalScore": 100,
+  "exercises": [
+    {
+      "name": "thread_spawn",
+      "max": 3,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "mutex_counter",
+      "max": 4,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "channel",
+      "max": 4,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "process_pipe",
+      "max": 4,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "mem_primitives",
+      "max": 4,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "bump_allocator",
+      "max": 5,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "free_list_allocator",
+      "max": 5,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "syscall_wrapper",
+      "max": 5,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "fd_table",
+      "max": 5,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "atomic_counter",
+      "max": 4,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "atomic_ordering",
+      "max": 4,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "spinlock",
+      "max": 4,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "spinlock_guard",
+      "max": 4,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "rwlock",
+      "max": 5,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "stack_coroutine",
+      "max": 6,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "green_threads",
+      "max": 6,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "basic_future",
+      "max": 4,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "tokio_tasks",
+      "max": 3,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "async_channel_ex",
+      "max": 3,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "select_timeout",
+      "max": 4,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "pte_flags",
+      "max": 3,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "page_table_walk",
+      "max": 4,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "multi_level_pt",
+      "max": 4,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    },
+    {
+      "name": "tlb_sim",
+      "max": 3,
+      "score": 0,
+      "status": "fail",
+      "exitCode": 101
+    }
+  ],
+  "student": "SpongeBob-0614",
+  "runId": "38712149022",
+  "runAttempt": "1",
+  "upload": {
+    "status": "pending"
+  }
+}
