@@ -157,7 +157,11 @@ pub fn double_in_thread(numbers: Vec<i32>) -> Vec<i32> {
     // TODO: Create a new thread to multiply each element of numbers by 2
     // Use thread::spawn and move closure
     // Use join().unwrap() to get result
-    todo!()
+    let handle = thread::spawn(move||{
+        numbers.into_iter().map(|n| n*2).collect()
+    });
+
+    handle.join().unwrap()
 }
 
 /// Sum two vectors in parallel, returning a tuple of two sums.
@@ -167,7 +171,13 @@ pub fn double_in_thread(numbers: Vec<i32>) -> Vec<i32> {
 pub fn parallel_sum(a: Vec<i32>, b: Vec<i32>) -> (i32, i32) {
     // TODO: Create two threads to sum a and b respectively
     // Join both threads to get results
-    todo!()
+    let handle_a = thread::spawn(move||{
+        a.into_iter().sum::<i32>()
+    });
+    let handle_b = thread::spawn(move||{
+        b.into_iter().sum::<i32>()
+    });
+    (handle_a.join().unwrap(),handle_b.join().unwrap())
 }
 
 // ============================================================================
@@ -183,9 +193,15 @@ pub fn parallel_sum(a: Vec<i32>, b: Vec<i32>) -> (i32, i32) {
 #[allow(unused_variables)]
 pub fn named_sleeper(value: i32, ms: u64) -> i32 {
     // TODO: Create a thread builder with name "sleeper"
+    let builder = thread::Builder::new().name("sleeper".into());
     // TODO: Spawn a thread that sleeps for `ms` milliseconds and returns `value`
+    let handle = builder.spawn(move||{
+        thread::sleep(Duration::from_millis(ms));
+        value
+    }).unwrap();
     // TODO: Join the thread and return the value
-    todo!()
+    handle.join().unwrap()
+    
 }
 
 thread_local! {
