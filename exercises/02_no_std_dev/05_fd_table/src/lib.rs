@@ -48,42 +48,46 @@ pub trait File: Send + Sync {
 
 /// File descriptor table
 pub struct FdTable {
-    // TODO: Design the internal structure
-    // Hint: use Vec<Option<Arc<dyn File>>>
-    //       the index is the fd number, None means the fd is closed or unallocated
+    entries: Vec<Option<Arc<dyn File>>>,
 }
 
 impl FdTable {
     /// Create an empty fd table
     pub fn new() -> Self {
-        // TODO
-        todo!()
+        Self {
+            entries: Vec::new(),
+        }
     }
 
     /// Allocate a new fd, return the fd number.
     ///
     /// Prefers reusing the smallest closed fd number; if no free slot, appends to the end.
     pub fn alloc(&mut self, file: Arc<dyn File>) -> usize {
-        // TODO
-        todo!()
+        if let Some(fd) = self.entries.iter().position(Option::is_none) {
+            self.entries[fd] = Some(file);
+            fd
+        } else {
+            let fd = self.entries.len();
+            self.entries.push(Some(file));
+            fd
+        }
     }
 
     /// Get the file object for an fd. Returns None if the fd doesn't exist or is closed.
     pub fn get(&self, fd: usize) -> Option<Arc<dyn File>> {
-        // TODO
-        todo!()
+        self.entries
+            .get(fd)
+            .and_then(|entry| entry.as_ref().map(Arc::clone))
     }
 
     /// Close an fd. Returns true on success, false if the fd doesn't exist or is already closed.
     pub fn close(&mut self, fd: usize) -> bool {
-        // TODO
-        todo!()
+        self.entries.get_mut(fd).and_then(Option::take).is_some()
     }
 
     /// Return the number of currently allocated fds (excluding closed ones)
     pub fn count(&self) -> usize {
-        // TODO
-        todo!()
+        self.entries.iter().filter(|entry| entry.is_some()).count()
     }
 }
 
@@ -194,6 +198,33 @@ mod tests {
         assert_eq!(table.count(), 1);
         table.close(fd1);
         assert_eq!(table.count(), 0);
+    }
+
+    #[test]
+    fn test_lowest_free_fd_and_double_close() {
+        let mut table = FdTable::new();
+        for id in 0..4 {
+            table.alloc(MockFile::new(id));
+        }
+        assert!(table.close(2));
+        assert!(table.close(0));
+        assert!(!table.close(0));
+        assert_eq!(table.alloc(MockFile::new(4)), 0);
+        assert_eq!(table.alloc(MockFile::new(5)), 2);
+        assert_eq!(table.count(), 4);
+    }
+
+    #[test]
+    fn test_file_lives_until_last_reference_is_dropped() {
+        let mut table = FdTable::new();
+        let file = MockFile::new(7);
+        let weak = Arc::downgrade(&file);
+        let fd = table.alloc(file);
+        let handle = table.get(fd).unwrap();
+        assert!(table.close(fd));
+        assert!(weak.upgrade().is_some());
+        drop(handle);
+        assert!(weak.upgrade().is_none());
     }
 
     #[test]
