@@ -22,6 +22,7 @@ use core::arch::naked_asm;
 const STACK_SIZE: usize = 1024 * 128;
 
 /// Task context (riscv64); layout must match `01_stack_coroutine::TaskContext` and the asm below.
+/// Floating-point registers use raw bits to preserve the riscv64gc hard-float ABI.
 #[repr(C)]
 #[derive(Debug, Default, Clone)]
 pub struct TaskContext {
@@ -39,6 +40,18 @@ pub struct TaskContext {
     s9: u64,
     s10: u64,
     s11: u64,
+    fs0: u64,
+    fs1: u64,
+    fs2: u64,
+    fs3: u64,
+    fs4: u64,
+    fs5: u64,
+    fs6: u64,
+    fs7: u64,
+    fs8: u64,
+    fs9: u64,
+    fs10: u64,
+    fs11: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -69,13 +82,17 @@ extern "C" fn thread_wrapper() {
     thread_finished();
 }
 
-/// Save current callee-saved regs into `old`, load from `new`, then `ret` to `new.ra`.
+/// Save current integer and floating-point callee-saved regs into `old`,
+/// load from `new`, then `ret` to `new.ra`.
 /// Zero `a0`/`a1` before `ret` so we don't leak pointers into the new context.
 ///
 /// Must be `#[unsafe(naked)]` to prevent the compiler from generating a prologue/epilogue.
 #[unsafe(naked)]
-unsafe extern "C" fn switch_context(_old: &mut TaskContext, _new: &TaskContext) {
+unsafe extern "C" fn switch_context(_old: *mut TaskContext, _new: *const TaskContext) {
     naked_asm!(
+        // Naked assembly does not inherit the target's floating-point features.
+        ".option push",
+        ".option arch, +d",
         "sd sp, 0(a0)",
         "sd ra, 8(a0)",
         "sd s0, 16(a0)",
@@ -90,6 +107,18 @@ unsafe extern "C" fn switch_context(_old: &mut TaskContext, _new: &TaskContext) 
         "sd s9, 88(a0)",
         "sd s10, 96(a0)",
         "sd s11, 104(a0)",
+        "fsd fs0, 112(a0)",
+        "fsd fs1, 120(a0)",
+        "fsd fs2, 128(a0)",
+        "fsd fs3, 136(a0)",
+        "fsd fs4, 144(a0)",
+        "fsd fs5, 152(a0)",
+        "fsd fs6, 160(a0)",
+        "fsd fs7, 168(a0)",
+        "fsd fs8, 176(a0)",
+        "fsd fs9, 184(a0)",
+        "fsd fs10, 192(a0)",
+        "fsd fs11, 200(a0)",
         "ld sp, 0(a1)",
         "ld ra, 8(a1)",
         "ld s0, 16(a1)",
@@ -104,9 +133,22 @@ unsafe extern "C" fn switch_context(_old: &mut TaskContext, _new: &TaskContext) 
         "ld s9, 88(a1)",
         "ld s10, 96(a1)",
         "ld s11, 104(a1)",
+        "fld fs0, 112(a1)",
+        "fld fs1, 120(a1)",
+        "fld fs2, 128(a1)",
+        "fld fs3, 136(a1)",
+        "fld fs4, 144(a1)",
+        "fld fs5, 152(a1)",
+        "fld fs6, 160(a1)",
+        "fld fs7, 168(a1)",
+        "fld fs8, 176(a1)",
+        "fld fs9, 184(a1)",
+        "fld fs10, 192(a1)",
+        "fld fs11, 200(a1)",
         "li a0, 0",
         "li a1, 0",
         "ret",
+        ".option pop",
     );
 }
 
@@ -137,7 +179,19 @@ impl Scheduler {
     ///    `sp` must be 16-byte aligned (e.g. `(stack_top - 16) & !15` to leave headroom).
     /// 3. Push a `GreenThread` with this context, state `Ready`, and `entry` stored for the wrapper to call.
     pub fn spawn(&mut self, entry: extern "C" fn()) {
-        todo!("alloc stack, init ctx with ra=thread_wrapper and aligned sp, push GreenThread(Ready, entry)")
+        let stack = vec![0; STACK_SIZE];
+        let stack_top = stack.as_ptr() as usize + stack.len();
+        let ctx = TaskContext {
+            sp: ((stack_top - 16) & !15) as u64,
+            ra: thread_wrapper as *const () as u64,
+            ..TaskContext::default()
+        };
+        self.threads.push(GreenThread {
+            ctx,
+            state: ThreadState::Ready,
+            _stack: Some(stack),
+            entry: Some(entry),
+        });
     }
 
     /// Run the scheduler until all threads (except the main one) are `Finished`.
@@ -146,21 +200,55 @@ impl Scheduler {
     /// 2. Loop: if all threads in `threads[1..]` are `Finished`, break; otherwise call `schedule_next()` (which may switch away and later return).
     /// 3. Clear `SCHEDULER` when done.
     pub fn run(&mut self) {
-        todo!("set SCHEDULER to self, loop until threads[1..] all Finished, call schedule_next, then clear SCHEDULER")
+        let scheduler = self as *mut Self;
+        unsafe {
+            assert!(SCHEDULER.is_null(), "a scheduler is already running");
+            SCHEDULER = scheduler;
+            // Do not retain a Rust reference across a switch: yielded threads also
+            // access this scheduler. Raw pointers require reloading their changes.
+            while (&(*scheduler).threads)[1..]
+                .iter()
+                .any(|thread| thread.state != ThreadState::Finished)
+            {
+                Self::schedule_next(scheduler);
+            }
+            SCHEDULER = std::ptr::null_mut();
+        }
     }
 
     /// Find the next ready thread (starting from `current + 1` round-robin), mark current as `Ready` (if not `Finished`), mark next as `Running`, set `CURRENT_THREAD_ENTRY` if the next thread has an entry, then switch to it.
-    fn schedule_next(&mut self) {
-        todo!("round-robin find next Ready, set current Ready (if not Finished), next Running, CURRENT_THREAD_ENTRY, then switch_context")
+    unsafe fn schedule_next(scheduler: *mut Self) {
+        let (old_ctx, new_ctx) = {
+            let sched = &mut *scheduler;
+            let count = sched.threads.len();
+            let Some(next) = (1..count)
+                .map(|offset| (sched.current + offset) % count)
+                .find(|&index| sched.threads[index].state == ThreadState::Ready)
+            else {
+                return;
+            };
+
+            let current = sched.current;
+            if sched.threads[current].state != ThreadState::Finished {
+                sched.threads[current].state = ThreadState::Ready;
+            }
+            sched.threads[next].state = ThreadState::Running;
+            sched.current = next;
+            if let Some(entry) = sched.threads[next].entry.take() {
+                CURRENT_THREAD_ENTRY = Some(entry);
+            }
+            (
+                &raw mut sched.threads[current].ctx,
+                &raw const sched.threads[next].ctx,
+            )
+        };
+        switch_context(old_ctx, new_ctx);
     }
 }
 
-impl TaskContext {
-    fn as_mut_ptr(&mut self) -> *mut TaskContext {
-        self as *mut TaskContext
-    }
-    fn as_ptr(&self) -> *const TaskContext {
-        self as *const TaskContext
+impl Default for Scheduler {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -170,7 +258,7 @@ static mut SCHEDULER: *mut Scheduler = std::ptr::null_mut();
 pub fn yield_now() {
     unsafe {
         if !SCHEDULER.is_null() {
-            (*SCHEDULER).schedule_next();
+            Scheduler::schedule_next(SCHEDULER);
         }
     }
 }
@@ -179,9 +267,10 @@ pub fn yield_now() {
 fn thread_finished() {
     unsafe {
         if !SCHEDULER.is_null() {
-            let sched = &mut *SCHEDULER;
-            sched.threads[sched.current].state = ThreadState::Finished;
-            sched.schedule_next();
+            let scheduler = SCHEDULER;
+            let current = (*scheduler).current;
+            (&mut (*scheduler).threads)[current].state = ThreadState::Finished;
+            Scheduler::schedule_next(scheduler);
         }
     }
 }
@@ -189,7 +278,7 @@ fn thread_finished() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
     use std::sync::Mutex;
 
     /// Tests must run serially: the scheduler uses global state (SCHEDULER, CURRENT_THREAD_ENTRY).
@@ -246,5 +335,90 @@ mod tests {
         sched.run();
 
         assert_eq!(SIMPLE_FLAG.load(Ordering::SeqCst), 42);
+    }
+
+    #[test]
+    fn test_empty_and_reused_scheduler() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        let mut sched = Scheduler::new();
+        sched.run();
+        sched.spawn(simple_task);
+        sched.run();
+        assert_eq!(sched.threads[1].state, ThreadState::Finished);
+        sched.spawn(task_b);
+        EXEC_ORDER.store(0, Ordering::SeqCst);
+        sched.run();
+        assert_eq!(EXEC_ORDER.load(Ordering::SeqCst), 11);
+        assert!(sched.threads[1..]
+            .iter()
+            .all(|thread| thread.state == ThreadState::Finished));
+        assert_eq!(sched.current, 0);
+        assert!(unsafe { SCHEDULER.is_null() });
+    }
+
+    #[test]
+    fn test_floating_point_registers_survive_yield() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        static FIRST: AtomicU64 = AtomicU64::new(0);
+        static SECOND: AtomicU64 = AtomicU64::new(0);
+
+        extern "C" fn first_task() {
+            unsafe {
+                core::arch::asm!(
+                    "fmv.d.x fs0, {first}",
+                    "fmv.d.x fs11, {last}",
+                    first = in(reg) 0x1234_u64,
+                    last = in(reg) 0x5678_u64,
+                    out("fs0") _,
+                    out("fs11") _,
+                    options(nostack),
+                );
+            }
+            yield_now();
+            let (first, last): (u64, u64);
+            unsafe {
+                core::arch::asm!(
+                    "fmv.x.d {first}, fs0",
+                    "fmv.x.d {last}, fs11",
+                    first = out(reg) first,
+                    last = out(reg) last,
+                    options(nostack),
+                );
+            }
+            FIRST.store((first << 16) | last, Ordering::SeqCst);
+        }
+
+        extern "C" fn second_task() {
+            unsafe {
+                core::arch::asm!(
+                    "fmv.d.x fs0, {first}",
+                    "fmv.d.x fs11, {last}",
+                    first = in(reg) 0x9abc_u64,
+                    last = in(reg) 0xdef0_u64,
+                    out("fs0") _,
+                    out("fs11") _,
+                    options(nostack),
+                );
+            }
+            yield_now();
+            let (first, last): (u64, u64);
+            unsafe {
+                core::arch::asm!(
+                    "fmv.x.d {first}, fs0",
+                    "fmv.x.d {last}, fs11",
+                    first = out(reg) first,
+                    last = out(reg) last,
+                    options(nostack),
+                );
+            }
+            SECOND.store((first << 16) | last, Ordering::SeqCst);
+        }
+
+        let mut sched = Scheduler::new();
+        sched.spawn(first_task);
+        sched.spawn(second_task);
+        sched.run();
+        assert_eq!(FIRST.load(Ordering::SeqCst), 0x12345678);
+        assert_eq!(SECOND.load(Ordering::SeqCst), 0x9abcdef0);
     }
 }
