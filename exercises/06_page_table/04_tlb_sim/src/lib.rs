@@ -88,10 +88,17 @@ impl Tlb {
     ///
     /// 返回匹配条目的 `ppn`，未命中返回 None。
     pub fn lookup(&mut self, vpn: u64, asid: u16) -> Option<u64> {
-        // TODO: 遍历 self.entries，查找 valid && vpn 匹配 && asid 匹配的条目
-        // 命中：self.stats.hits += 1，返回 Some(entry.ppn)
-        // 未命中：self.stats.misses += 1，返回 None
-        todo!()
+        if let Some(entry) = self
+            .entries
+            .iter()
+            .find(|entry| entry.valid && entry.vpn == vpn && entry.asid == asid)
+        {
+            self.stats.hits += 1;
+            Some(entry.ppn)
+        } else {
+            self.stats.misses += 1;
+            None
+        }
     }
 
     /// 将一条新映射插入 TLB。
@@ -101,44 +108,62 @@ impl Tlb {
     /// 2. 否则，写入 `fifo_ptr` 指向的位置
     /// 3. 将 `fifo_ptr` 前进到下一个位置（循环：`(fifo_ptr + 1) % capacity`）
     pub fn insert(&mut self, vpn: u64, ppn: u64, asid: u16, flags: u64) {
-        // TODO: 实现 TLB 插入
-        // 提示：
-        //   先查找已有条目：
-        //   for entry in &mut self.entries {
-        //       if entry.valid && entry.vpn == vpn && entry.asid == asid { 更新并返回 }
-        //   }
-        //   写入 fifo_ptr 位置，然后推进指针
-        todo!()
+        if let Some(entry) = self
+            .entries
+            .iter_mut()
+            .find(|entry| entry.valid && entry.vpn == vpn && entry.asid == asid)
+        {
+            entry.ppn = ppn;
+            entry.flags = flags;
+            return;
+        }
+        if self.capacity == 0 {
+            return;
+        }
+        self.entries[self.fifo_ptr] = TlbEntry {
+            valid: true,
+            asid,
+            vpn,
+            ppn,
+            flags,
+        };
+        self.fifo_ptr = (self.fifo_ptr + 1) % self.capacity;
     }
 
     /// 刷新整个 TLB（将所有条目标记为无效）。
     ///
     /// 这对应于 RISC-V 的 `sfence.vma`（不带参数）操作。
     pub fn flush_all(&mut self) {
-        // TODO: 将所有条目的 valid 设为 false
-        todo!()
+        for entry in &mut self.entries {
+            entry.valid = false;
+        }
     }
 
     /// 刷新指定虚拟页的 TLB 条目。
     ///
     /// 对应 `sfence.vma vaddr`：只刷新匹配 `vpn` 的条目（任意 ASID）。
     pub fn flush_by_vpn(&mut self, vpn: u64) {
-        // TODO: 将所有 vpn 匹配的条目标记为无效
-        todo!()
+        for entry in &mut self.entries {
+            if entry.vpn == vpn {
+                entry.valid = false;
+            }
+        }
     }
 
     /// 刷新指定地址空间（ASID）的所有 TLB 条目。
     ///
     /// 对应 `sfence.vma zero, asid`：刷新该 ASID 的所有条目。
     pub fn flush_by_asid(&mut self, asid: u16) {
-        // TODO: 将所有 asid 匹配的条目标记为无效
-        todo!()
+        for entry in &mut self.entries {
+            if entry.asid == asid {
+                entry.valid = false;
+            }
+        }
     }
 
     /// 返回当前有效条目的数量。
     pub fn valid_count(&self) -> usize {
-        // TODO: 统计 valid == true 的条目数
-        todo!()
+        self.entries.iter().filter(|entry| entry.valid).count()
     }
 }
 
@@ -193,14 +218,46 @@ impl Mmu {
     /// 4. 页表命中 → 回填 TLB（insert），返回 Some(ppn)
     /// 5. 页表未命中 → 返回 None（缺页）
     pub fn translate(&mut self, vpn: u64) -> Option<u64> {
-        // TODO: 实现 TLB + 页表的二级查找
-        todo!()
+        if let Some(ppn) = self.tlb.lookup(vpn, self.current_asid) {
+            return Some(ppn);
+        }
+        let (_, mapping) = self
+            .page_table
+            .iter()
+            .find(|(asid, mapping)| *asid == self.current_asid && mapping.vpn == vpn)?;
+        self.tlb
+            .insert(vpn, mapping.ppn, self.current_asid, mapping.flags);
+        Some(mapping.ppn)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_zero_capacity_mmu_always_walks() {
+        let mut mmu = Mmu::new(0);
+        mmu.add_mapping(0, 1, 2, 0x7);
+        assert_eq!(mmu.translate(1), Some(2));
+        assert_eq!(mmu.translate(1), Some(2));
+        assert_eq!(mmu.tlb.valid_count(), 0);
+        assert_eq!(mmu.tlb.stats.hits, 0);
+        assert_eq!(mmu.tlb.stats.misses, 2);
+    }
+
+    #[test]
+    fn test_update_preserves_fifo_order_and_flags() {
+        let mut tlb = Tlb::new(2);
+        tlb.insert(1, 10, 0, 0x3);
+        tlb.insert(2, 20, 0, 0x3);
+        tlb.insert(1, 11, 0, 0x7);
+        assert_eq!(tlb.entries[0].flags, 0x7);
+        tlb.insert(3, 30, 0, 0x3);
+        assert_eq!(tlb.lookup(1, 0), None);
+        assert_eq!(tlb.lookup(2, 0), Some(20));
+        assert_eq!(tlb.lookup(3, 0), Some(30));
+    }
 
     // ──────── TLB 基础测试 ────────
 
