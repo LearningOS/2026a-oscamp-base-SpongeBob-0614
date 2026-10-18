@@ -31,32 +31,37 @@ impl<T> SpinLock<T> {
 
     /// Acquire lock, returning a mutable reference to inner data.
     ///
-    /// TODO: Use compare_exchange to spin until lock is acquired
-    /// 1. In a loop, try to change locked from false to true
-    /// 2. Success uses Acquire ordering, failure uses Relaxed
-    /// 3. On failure call `core::hint::spin_loop()` to hint CPU
-    /// 4. On success return `&mut *self.data.get()`
-    ///
-    /// # Safety
-    /// Caller must ensure `unlock` is called after using the data.
+    /// Spins until an Acquire compare-exchange succeeds.
+    /// Call `unlock` after the returned reference is no longer in use.
     pub fn lock(&self) -> &mut T {
-        // TODO
-        todo!()
+        while self
+            .locked
+            .compare_exchange_weak(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
+            core::hint::spin_loop();
+        }
+        // SAFETY: the acquired lock grants exclusive access until unlock.
+        unsafe { &mut *self.data.get() }
     }
 
     /// Release lock.
     ///
-    /// TODO: Set locked to false (using Release ordering)
+    /// This low-level teaching API relies on the caller owning the lock and
+    /// never using a returned reference after unlocking. The RAII guard in the
+    /// next exercise enforces these rules through Rust's type system.
     pub fn unlock(&self) {
-        // TODO
-        todo!()
+        self.locked.store(false, Ordering::Release);
     }
 
     /// Try to acquire lock without spinning.
     /// Returns Some(&mut T) on success, None if lock is busy.
     pub fn try_lock(&self) -> Option<&mut T> {
-        // TODO: Single compare_exchange attempt
-        todo!()
+        self.locked
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .ok()
+            // SAFETY: a successful acquisition grants exclusive access.
+            .map(|_| unsafe { &mut *self.data.get() })
     }
 }
 
@@ -133,6 +138,17 @@ mod tests {
         let mut sorted = data.clone();
         sorted.sort();
         assert_eq!(sorted, vec![0, 1, 2, 3, 4]);
+        lock.unlock();
+    }
+
+    #[test]
+    fn test_try_lock_does_not_release_an_existing_lock() {
+        let lock = SpinLock::new(1);
+        let value = lock.lock();
+        assert!(lock.try_lock().is_none());
+        *value = 2;
+        lock.unlock();
+        assert_eq!(lock.try_lock().map(|value| *value), Some(2));
         lock.unlock();
     }
 }
