@@ -13,7 +13,7 @@
 //! When thread A writes with Release, and thread B reads the same location with Acquire,
 //! thread B will see all writes that thread A performed before the Release.
 
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
 
 /// Use Release-Acquire semantics to safely pass data between two threads.
 ///
@@ -33,28 +33,22 @@ impl FlagChannel {
     }
 
     /// Producer: store data first, then set ready flag.
-    ///
-    /// TODO: Choose correct Ordering
-    /// - What Ordering should be used for writing data?
-    /// - What Ordering should be used for writing ready? (ensuring data writes are visible to consumer)
+    /// Release publishes the preceding data store to an acquiring consumer.
     pub fn produce(&self, value: u32) {
-        // TODO: Store data (choose appropriate Ordering)
-        // TODO: Set ready = true (choose appropriate Ordering so data writes complete before this)
-        todo!()
+        self.data.store(value, Ordering::Relaxed);
+        self.ready.store(true, Ordering::Release);
     }
 
     /// Consumer: spin-wait for ready flag, then read data.
-    ///
-    /// TODO: Choose correct Ordering
-    /// - What Ordering should be used for reading ready? (ensuring it sees data writes from produce)
-    /// - What Ordering should be used for reading data?
+    /// Acquire pairs with the producer's Release before reading the data.
     pub fn consume(&self) -> u32 {
-        // TODO: Spin-wait for ready to become true (choose appropriate Ordering)
-        // TODO: Read data (choose appropriate Ordering)
-        todo!()
+        while !self.ready.load(Ordering::Acquire) {
+            core::hint::spin_loop();
+        }
+        self.data.load(Ordering::Relaxed)
     }
 
-    /// Reset channel state
+    /// Reset channel state after the producer and consumer have finished.
     pub fn reset(&self) {
         self.ready.store(false, Ordering::Relaxed);
         self.data.store(0, Ordering::Relaxed);
@@ -64,14 +58,15 @@ impl FlagChannel {
 /// A simple once-initializer using SeqCst.
 /// Guarantees `init` is executed only once, and all threads see the initialized value.
 pub struct OnceCell {
-    initialized: AtomicBool,
+    // 0 = empty, 1 = initialization claimed, 2 = value published.
+    state: AtomicU8,
     value: AtomicU32,
 }
 
 impl OnceCell {
     pub const fn new() -> Self {
         Self {
-            initialized: AtomicBool::new(false),
+            state: AtomicU8::new(0),
             value: AtomicU32::new(0),
         }
     }
@@ -81,15 +76,27 @@ impl OnceCell {
     ///
     /// Hint: use `compare_exchange` to ensure only one thread succeeds.
     pub fn init(&self, val: u32) -> bool {
-        // TODO: Use compare_exchange to ensure initialization only once
-        // Store value on success
-        todo!()
+        if self
+            .state
+            .compare_exchange(0, 1, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            return false;
+        }
+        self.value.store(val, Ordering::SeqCst);
+        // Claiming initialization is separate from publishing the value: a
+        // reader must never observe the default value while init is in progress.
+        self.state.store(2, Ordering::SeqCst);
+        true
     }
 
     /// Get value. Returns Some if initialized, otherwise None.
     pub fn get(&self) -> Option<u32> {
-        // TODO: Check initialized flag, then read value
-        todo!()
+        if self.state.load(Ordering::SeqCst) == 2 {
+            Some(self.value.load(Ordering::SeqCst))
+        } else {
+            None
+        }
     }
 }
 
@@ -157,5 +164,44 @@ mod tests {
         // Exactly one thread initializes successfully
         assert_eq!(results.iter().filter(|&&r| r).count(), 1);
         assert!(cell.get().is_some());
+    }
+
+    #[test]
+    fn test_once_cell_only_publishes_the_winning_value() {
+        for _ in 0..32 {
+            let cell = Arc::new(OnceCell::new());
+            let barrier = Arc::new(std::sync::Barrier::new(5));
+            let handles: Vec<_> = (1..=4)
+                .map(|value| {
+                    let cell = Arc::clone(&cell);
+                    let barrier = Arc::clone(&barrier);
+                    thread::spawn(move || {
+                        barrier.wait();
+                        cell.init(value).then_some(value)
+                    })
+                })
+                .collect();
+            barrier.wait();
+            let published = loop {
+                if let Some(value) = cell.get() {
+                    break value;
+                }
+                thread::yield_now();
+            };
+            let winners: Vec<_> = handles
+                .into_iter()
+                .filter_map(|handle| handle.join().unwrap())
+                .collect();
+            assert_eq!(winners, vec![published]);
+            assert!((1..=4).contains(&published));
+        }
+    }
+
+    #[test]
+    fn test_once_cell_can_publish_zero() {
+        let cell = OnceCell::new();
+        assert!(cell.init(0));
+        assert_eq!(cell.get(), Some(0));
+        assert!(!cell.init(1));
     }
 }
