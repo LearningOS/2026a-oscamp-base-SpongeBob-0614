@@ -2,8 +2,8 @@
   "schema": 1,
   "courseId": 2074,
   "repository": "LearningOS/2026a-oscamp-base-SpongeBob-0614",
-  "commit": "edf5ea767847b3649db4ace6d7eb4001ca7e0ca1",
-  "score": 11,
+  "commit": "f17d33bd63fbb7ffd3458153976dfe16dcd284a8",
+  "score": 100,
   "totalScore": 100,
   "exercises": [
     {
@@ -30,155 +30,155 @@
     {
       "name": "process_pipe",
       "max": 4,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 4,
+      "status": "pass",
+      "exitCode": 0
     },
     {
       "name": "mem_primitives",
       "max": 4,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 4,
+      "status": "pass",
+      "exitCode": 0
     },
     {
       "name": "bump_allocator",
       "max": 5,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 5,
+      "status": "pass",
+      "exitCode": 0
     },
     {
       "name": "free_list_allocator",
       "max": 5,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 5,
+      "status": "pass",
+      "exitCode": 0
     },
     {
       "name": "syscall_wrapper",
       "max": 5,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 5,
+      "status": "pass",
+      "exitCode": 0
     },
     {
       "name": "fd_table",
       "max": 5,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 5,
+      "status": "pass",
+      "exitCode": 0
     },
     {
       "name": "atomic_counter",
       "max": 4,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 4,
+      "status": "pass",
+      "exitCode": 0
     },
     {
       "name": "atomic_ordering",
       "max": 4,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 4,
+      "status": "pass",
+      "exitCode": 0
     },
     {
       "name": "spinlock",
       "max": 4,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 4,
+      "status": "pass",
+      "exitCode": 0
     },
     {
       "name": "spinlock_guard",
       "max": 4,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 4,
+      "status": "pass",
+      "exitCode": 0
     },
     {
       "name": "rwlock",
       "max": 5,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 5,
+      "status": "pass",
+      "exitCode": 0
     },
     {
       "name": "stack_coroutine",
       "max": 6,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 6,
+      "status": "pass",
+      "exitCode": 0
     },
     {
       "name": "green_threads",
       "max": 6,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 6,
+      "status": "pass",
+      "exitCode": 0
     },
     {
       "name": "basic_future",
       "max": 4,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 4,
+      "status": "pass",
+      "exitCode": 0
     },
     {
       "name": "tokio_tasks",
       "max": 3,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 3,
+      "status": "pass",
+      "exitCode": 0
     },
     {
       "name": "async_channel_ex",
       "max": 3,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 3,
+      "status": "pass",
+      "exitCode": 0
     },
     {
       "name": "select_timeout",
       "max": 4,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 4,
+      "status": "pass",
+      "exitCode": 0
     },
     {
       "name": "pte_flags",
       "max": 3,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 3,
+      "status": "pass",
+      "exitCode": 0
     },
     {
       "name": "page_table_walk",
       "max": 4,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 4,
+      "status": "pass",
+      "exitCode": 0
     },
     {
       "name": "multi_level_pt",
       "max": 4,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 4,
+      "status": "pass",
+      "exitCode": 0
     },
     {
       "name": "tlb_sim",
       "max": 3,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 3,
+      "status": "pass",
+      "exitCode": 0
     }
   ],
   "student": "SpongeBob-0614",
-  "runId": "39125177577",
+  "runId": "39127188386",
   "runAttempt": "1",
   "upload": {
-    "status": "accepted"
+    "status": "pending"
   }
 }
