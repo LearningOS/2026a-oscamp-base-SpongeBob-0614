@@ -25,20 +25,17 @@ impl AtomicCounter {
     ///
     /// Hint: use `fetch_add` with `Ordering::Relaxed`
     pub fn increment(&self) -> u64 {
-        // TODO
-        todo!()
+        self.value.fetch_add(1, Ordering::Relaxed)
     }
 
     /// Atomically decrements by 1, returns the value **before** decrement.
     pub fn decrement(&self) -> u64 {
-        // TODO
-        todo!()
+        self.value.fetch_sub(1, Ordering::Relaxed)
     }
 
     /// Gets the current value.
     pub fn get(&self) -> u64 {
-        // TODO
-        todo!()
+        self.value.load(Ordering::Relaxed)
     }
 
     /// Atomic CAS (Compare-And-Swap) operation.
@@ -47,8 +44,8 @@ impl AtomicCounter {
     ///
     /// Hint: use `compare_exchange` with success ordering `Ordering::AcqRel` and failure ordering `Ordering::Acquire`
     pub fn compare_and_swap(&self, expected: u64, new_val: u64) -> Result<u64, u64> {
-        // TODO
-        todo!()
+        self.value
+            .compare_exchange(expected, new_val, Ordering::AcqRel, Ordering::Acquire)
     }
 
     /// Multiply the value atomically using a CAS loop.
@@ -56,13 +53,14 @@ impl AtomicCounter {
     ///
     /// Hint: read current value in loop, compute new value, try CAS to update, retry on failure.
     pub fn fetch_multiply(&self, multiplier: u64) -> u64 {
-        // TODO: CAS loop
-        // loop {
-        //     let current = ...
-        //     let new = current * multiplier;
-        //     match self.compare_and_swap(current, new) { ... }
-        // }
-        todo!()
+        let mut current = self.value.load(Ordering::Relaxed);
+        loop {
+            let new = current.wrapping_mul(multiplier);
+            match self.compare_and_swap(current, new) {
+                Ok(previous) => return previous,
+                Err(actual) => current = actual,
+            }
+        }
     }
 }
 
@@ -123,5 +121,27 @@ mod tests {
         }
 
         assert_eq!(counter.get(), 10000);
+    }
+
+    #[test]
+    fn test_multiply_wraps_like_atomic_addition() {
+        let counter = AtomicCounter::new(u64::MAX);
+        assert_eq!(counter.fetch_multiply(2), u64::MAX);
+        assert_eq!(counter.get(), u64::MAX - 1);
+    }
+
+    #[test]
+    fn test_concurrent_multiply_does_not_lose_updates() {
+        let counter = Arc::new(AtomicCounter::new(1));
+        let handles: Vec<_> = (0..10)
+            .map(|_| {
+                let counter = Arc::clone(&counter);
+                thread::spawn(move || counter.fetch_multiply(2))
+            })
+            .collect();
+        let mut previous: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+        previous.sort_unstable();
+        assert_eq!(previous, (0..10).map(|i| 1 << i).collect::<Vec<_>>());
+        assert_eq!(counter.get(), 1 << 10);
     }
 }
