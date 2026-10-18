@@ -2,8 +2,8 @@
   "schema": 1,
   "courseId": 2074,
   "repository": "LearningOS/2026a-oscamp-base-SpongeBob-0614",
-  "commit": "9a9c98a029e99330925d921abf4b5c5228fdc5a5",
-  "score": 3,
+  "commit": "af6dfa9f3dc13d8b0341dd958e14227c5173f892",
+  "score": 7,
   "totalScore": 100,
   "exercises": [
     {
@@ -16,9 +16,9 @@
     {
       "name": "mutex_counter",
       "max": 4,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 4,
+      "status": "pass",
+      "exitCode": 0
     },
     {
       "name": "channel",
@@ -176,9 +176,9 @@
     }
   ],
   "student": "SpongeBob-0614",
-  "runId": "38755074399",
+  "runId": "39121574057",
   "runAttempt": "1",
   "upload": {
-    "status": "accepted"
+    "status": "pending"
   }
 }
